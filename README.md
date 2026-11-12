@@ -16,6 +16,7 @@ sections below list exactly what changed and why — nothing was silently droppe
 │   ├── default.nix         # imports both
 │   ├── waybar-config.nix   # the bar: programs.waybar settings + style.css
 │   └── waybar-river.nix    # packages, mako, river bindings
+├── examples/               # copy-paste flake.nix / configuration.nix / home.nix
 ├── scripts/                # the custom/* module backends (bash)
 ├── style.css               # GTK3 CSS, read by waybar-config.nix
 └── LICENCE                 # MIT, from the original project
@@ -23,39 +24,67 @@ sections below list exactly what changed and why — nothing was silently droppe
 
 ## Install
 
-You need `river-classic`, not `river`: river 0.4+ removed the
-`zriver_status_manager_v1` protocol, and that is what Waybar's `river/tags` and
-`river/window` modules speak. The Home Manager `river` module already defaults to
-`pkgs.river-classic`, and this flake asserts on it.
+Three things to know before you start:
 
-### Flake
+1. **You need `river-classic`, not `river`.** River 0.4+ removed the
+   `zriver_status_manager_v1` protocol, and that is what Waybar's `river/tags` and
+   `river/window` modules speak. The Home Manager `river` module already defaults
+   to `pkgs.river-classic`, and this config asserts on it so you find out at build
+   time rather than with a blank bar.
+2. **The flake input is pinned to this branch** while the work is unmerged. After
+   it lands on `main`, drop the suffix from the URL.
+3. **Nothing needs root except the system services.** The bar, its scripts and
+   mako are all per-user Home Manager options.
+
+Copy-paste examples live in `examples/`: `flake.nix`, `configuration.nix`,
+`home.nix`. Replace `HOSTNAME` and `USER`, then:
+
+```sh
+sudo nixos-rebuild switch --flake /etc/nixos#HOSTNAME   # Option A
+# or, for standalone Home Manager:
+home-manager switch --flake .#USER@HOSTNAME             # Option B
+```
+
+Then log out and pick the **river** session at the display manager. The bar starts
+with `river-session.target`; no autostart line and no `launch.sh` in
+`~/.config/river/init` is needed.
+
+### The short version
 
 ```nix
-# flake.nix of your own config
-inputs.waybar-river.url = "github:Clide888/NixOS-waybar-config-repo";
+# flake.nix
+inputs.waybar-river.url =
+  "github:Clide888/NixOS-waybar-config-repo/arena/f4451ba9-nixos-waybar-config-repo";
+# after merge: "github:Clide888/NixOS-waybar-config-repo"
 ```
 
 ```nix
 # home.nix
-{ inputs, ... }:
+{ inputs, pkgs, ... }:
 {
-  imports = [
-    inputs.home-manager.nixosModules.home-manager
-    inputs.waybar-river.homeManagerModules.default
-  ];
+  imports = [ inputs.waybar-river.homeManagerModules.default ];
 
   services.waybar-river.enable = true;
 
-  # Your river config (bindings/window rules) is yours; this config only adds
-  # the bar-related binds.
   wayland.windowManager.river = {
     enable = true;
-    package = pkgs.river-classic;   # the default, spelled out for clarity
+    package = pkgs.river-classic;   # the default, spelled out on purpose
+    # your own bindings / rules stay here, untouched
   };
 }
 ```
 
-### Non-flake
+```nix
+# configuration.nix
+services.displayManager.sessionPackages = [ pkgs.river-classic ];
+networking.networkmanager.enable = true;      # nmcli, custom/wifi
+hardware.bluetooth.enable = true;             # bluetoothctl, custom/wifi
+services.power-profiles-daemon.enable = true; # power-profiles-daemon module
+services.upower.enable = true;                # battery module
+hardware.acpilight.enable = true;             # backlight module
+```
+
+### Without flakes
 
 ```nix
 # home.nix
@@ -65,28 +94,29 @@ inputs.waybar-river.url = "github:Clide888/NixOS-waybar-config-repo";
 }
 ```
 
-### NixOS side
+`/path/to/...` is copied into the Nix store at evaluation, so a `git clone` into
+`~/src/waybar-river` works fine. Point it at a fixed path, not `~/.config`, and
+re-run `nixos-rebuild`/`home-manager switch` after editing the scripts here.
 
-The scripts used to be installed by `first_time_setup.sh` with `pacman` and
-`systemctl`. That is `configuration.nix` now:
+### Checking it builds before switching
 
-```nix
-{
-  services.xserver.enable = true;               # for a display manager
-  services.displayManager.sessionPackages = [ pkgs.river-classic ];
-
-  networking.networkmanager.enable = true;      # nmcli, custom/wifi
-  hardware.bluetooth.enable = true;             # bluetoothctl, custom/wifi
-  services.power-profiles-daemon.enable = true; # power-profiles-daemon module
-  services.upower.enable = true;                # battery module
-  hardware.acpilight.enable = true;             # backlight module (or brightnessctl)
-}
+```sh
+nix build .#checks.x86_64-linux.example     # this repo's own example config
+# or, in your own flake:
+nixos-rebuild build --flake .#HOSTNAME
+home-manager build --flake .#USER@HOSTNAME
 ```
 
-`programs.waybar.systemd.targets` is set to `river-session.target` by the module,
-so the bar starts with the session instead of waiting for a
-`graphical-session.target` that a river session never activates — the trap the old
-swaync service fell into.
+### If something is missing from the bar
+
+| Symptom | Cause |
+|---|---|
+| Tags render but never highlight, `river/window` empty | you are running `pkgs.river` (0.4+), not `river-classic` |
+| Bar never appears | no display manager session: check `services.displayManager.sessionPackages` includes `river-classic`, or start it once by hand with `waybar` |
+| Glyphs are boxes | `nerd-fonts.jetbrains-mono` is installed per-user by the module; check `fc-list \| grep -i "JetBrainsMono NFP"` inside the session |
+| `custom/*` capsules empty | run the script by hand, e.g. `waybar-wifi-bt`, and read stderr |
+| `power-profiles-daemon` empty | `services.power-profiles-daemon.enable = true`, and no `services.tlp` (they conflict) |
+| `custom/notify` shows the "on" bell but DND does nothing | `makoctl mode` must list `do-not-disturb`; `services.mako` in this module sets it up |
 
 ## What changed, and why
 
@@ -190,6 +220,18 @@ the tools they need (`jq`, `nmcli`, `bluetoothctl`, `makoctl`, `wlrctl`,
 
 Override the app set spawned by the reset button with
 `SYSTEM_RESET_APPS="firefox \"kitty -e htop\" dolphin"`.
+
+## Moving from the Arch setup
+
+1. Back up `~/.config/waybar`, `~/.config/swaync` and `~/.config/mako`.
+2. Delete the Hyprland autostart lines (`swaync &`, `waybar &`,
+   `workspace_bar_daemon.py &`) and the `SUPER+A` binding — they now come from
+   `river/init` and `river-session.target` instead. Leaving the old ones in place
+   gives you two bars fighting over the same layer surface.
+3. Mask anything the Arch setup enabled that NixOS will not manage, e.g.
+   `systemctl --user disable --now swaync.service`.
+4. `~/.config/waybar`, `~/.config/mako` and `~/.config/river/init` become
+   read-only store symlinks. Do not edit them in place; edit `home.nix`.
 
 ## Restarting the bar
 
