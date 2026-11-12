@@ -1,0 +1,211 @@
+* {
+  min-height: 0;
+  min-width: 0;
+  font-family: "JetBrainsMono NFP";
+  font-size: 12px;
+  font-weight: 600;
+  /* Padding/margin here compounds across every widget - keep it empty. */
+}
+
+window#waybar {
+  transition-property: background-color;
+  transition-duration: 0.5s;
+  background-color: rgba(29, 30, 41, 0.5);
+}
+
+/* river/window has no `.empty` class (the Hyprland module did), so the
+   transparent-bar-on-an-empty-tag effect was dropped with it. Not replacing it
+   with `:empty`-style tricks: the classes river reports are per-output focus,
+   not window count. */
+
+#window {
+  /* river/window is not in the layout - it only exists for the title tooltip
+     plumbing. Give it no size or chrome of its own if you add it back. */
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  background-color: transparent;
+}
+
+/*
+margin (outer spacing) = top right bottom left
+padding (inner spacing)
+"10px" alone = 10px on every side
+"margin: 10px 20px" = 10px top/bottom, 20px left/right
+*/
+
+/* ---------- river tags (was #workspaces) ---------- */
+
+#tags {
+  background: #11111b;
+  border-radius: 16px;
+  border: solid 2px #11111b;
+  font-weight: normal;
+  font-style: normal;
+  padding: 0.1rem;
+  margin: 0.3rem 0 0.35rem 0.4rem;
+}
+
+#tags button {
+  color: #6c7086;
+  background-color: transparent;
+  border-radius: 16px;
+  min-width: 30px;
+  transition: all 0.2s ease-in-out;
+}
+
+/* occupied: has at least one window - visible but quiet */
+#tags button.occupied {
+  color: #cdd6f4;
+}
+
+/* focused: the tag (or tags) currently in view */
+#tags button.focused {
+  color: #1e1e2e;
+  background-color: #cdd6f4;
+  border-radius: 18px;
+  min-width: 80px;
+}
+
+/* urgent: a window set the urgency hint */
+#tags button.urgent {
+  color: #f38ba8;
+}
+
+/* tags on the focused output - river's equivalent of "this is the monitor you
+   are typing on". Kept as a subtle underline; drop it if you use one output. */
+#tags button.output {
+  text-decoration: none;
+}
+
+#tags button:hover {
+  color: #cdd6f4;
+  background-color: #313244;
+  border-radius: 16px;
+  min-width: 40px;
+}
+
+/* ---------- capsules ---------- */
+
+#battery,
+#power-profiles-daemon,
+#backlight,
+#wireplumber,
+#clock,
+#custom-uptime,
+#custom-wifi,
+#custom-sysinfo,
+#custom-notify,
+#custom-window {
+  padding: 0.1rem 0.7rem;
+  margin: 0.15rem 0.2rem 1rem 0;
+  border-radius: 0.5rem;
+  background-color: #1e1e2e;
+}
+
+#clock {
+  padding: 0.15rem 0.7rem;
+  margin: 0.15rem 0.2rem 1rem 0.15rem;
+  color: #74c7ec;
+}
+
+#clock.simpleclock {
+  color: #89b4fa;
+}
+
+/* nmcli + bluetoothctl, color preserved from the old network module */
+#custom-wifi {
+  color: peru;
+}
+
+#custom-wifi.disconnected {
+  color: #6c7086;
+}
+
+#custom-uptime {
+  color: seashell;
+}
+
+/* stopwatch state - the box still shows uptime, only the color changes (no blink) */
+#custom-uptime.running {
+  color: #a6e3a1;
+}
+
+#custom-uptime.paused {
+  color: #f9e2af;
+}
+
+#battery {
+  color: #a6e3a1;
+}
+
+#battery.warning {
+  color: #f9e2af;
+}
+
+#battery.critical {
+  color: #f38ba8;
+}
+
+#power-profiles-daemon {
+  color: #cba6f7;
+}
+
+#backlight {
+  color: #f9e2af;
+}
+
+#wireplumber {
+  color: #94e2d5;
+}
+
+/* CPU + RAM. Doubles as the session-reset button: a slow resting glow plus
+   hover/press states signal that it is clickable. The one deliberate animation
+   on the bar. */
+@keyframes sysinfo-pulse {
+  0%   { text-shadow: 0 0 0 rgba(116, 199, 236, 0); }
+  50%  { text-shadow: 0 0 6px rgba(116, 199, 236, 0.75); }
+  100% { text-shadow: 0 0 0 rgba(116, 199, 236, 0); }
+}
+
+#custom-sysinfo {
+  color: #74c7ec;
+  transition: color 0.2s ease-in-out,
+              padding 0.2s ease-in-out,
+              background-color 0.2s ease-in-out;
+  animation: sysinfo-pulse 3s ease-in-out infinite;
+}
+
+#custom-sysinfo:hover {
+  color: #89dceb;
+  padding: 0.15rem 1.6rem;
+  background-color: #313244;
+  animation: none;
+}
+
+#custom-sysinfo:active {
+  color: #1e1e2e;
+  background-color: #74c7ec;
+}
+
+#custom-sysinfo.warning {
+  color: #f9e2af;
+}
+
+#custom-sysinfo.critical {
+  color: #f38ba8;
+}
+
+/* notification bell (mako, was swaync) */
+#custom-notify {
+  color: #cba6f7;
+}
+
+/* Do Not Disturb is on */
+#custom-notify.dnd {
+  color: #6c7086;
+}
+
+#custom-window {
+  color: #cdd6f4;
+}
