@@ -1,5 +1,5 @@
-{
-  "mainBar": {
+[
+  {
     "layer": "top",
     "position": "top",
     "height": 26,
@@ -164,4 +164,4 @@
       "on-click-right": "makoctl dismiss -a"
     }
   }
-}
+]

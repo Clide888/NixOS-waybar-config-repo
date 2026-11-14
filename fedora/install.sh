@@ -107,6 +107,19 @@ backup "$HOME/.config/river/init"
 
 log "installing waybar config"
 install -Dm644 "$REPO_ROOT/fedora/waybar/config.jsonc" "$WAYBAR_DIR/config"
+# waybar's config file must be a top-level JSON *array* of bar objects (that is
+# what home-manager's programs.waybar.settings emits on NixOS). A bare object
+# parses, but no output ever matches it, the bar is never constructed, and
+# waybar sits there spawned with nothing on screen - so check the shape.
+if command -v jq >/dev/null 2>&1; then
+    if ! jq -e 'type == "array" and (.[0] | has("modules-left") and has("modules-right") and has("position"))' \
+            "$WAYBAR_DIR/config" >/dev/null; then
+        echo "install.sh: $WAYBAR_DIR/config is not a waybar bar array - aborting" >&2
+        echo "(see fedora/README.md - \"waybar spawns but no bar appears\")" >&2
+        exit 1
+    fi
+    log "waybar config sanity check passed"
+fi
 # style.css is shared with the NixOS port - single source of truth at repo root
 install -Dm644 "$REPO_ROOT/style.css" "$WAYBAR_DIR/style.css"
 

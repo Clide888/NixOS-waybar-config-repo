@@ -78,7 +78,7 @@ Fedora ships two different compositors:
 
 | Destination | Content |
 |---|---|
-| `~/.config/waybar/config` | the bar layout (from `waybar/config.jsonc`, strict JSON) |
+| `~/.config/waybar/config` | the bar layout (from `waybar/config.jsonc` — top-level JSON **array**, like home-manager emits) |
 | `~/.config/waybar/style.css` | capsule colors, Catppuccin palette (from the repo-root `style.css`) |
 | `~/.config/waybar/scripts/*.sh` | the `custom/*` backends, executable |
 | `~/.config/waybar/config` exec lines | reference `$HOME/.config/waybar/scripts/…` — waybar runs `exec` via `/bin/sh -c`, so `$HOME` expands |
@@ -120,6 +120,20 @@ you've hit an rfkill soft block: `rfkill list` / `rfkill unblock bluetooth`.
 
 ## Notes and gotchas
 
+- **"waybar spawns but no bar appears"** is the signature of a waybar config
+  that parses but is the wrong *shape*. `~/.config/waybar/config` must be a
+  top-level JSON **array** of bar objects — exactly what home-manager's
+  `programs.waybar.settings` emits on NixOS. A bare object (e.g. wrapping the
+  bar in `mainBar`) is accepted silently: no output matches it, the `Bar`
+  constructor throws before a window is created, and waybar stays running
+  with nothing on screen. `install.sh` refuses to finish with a malformed
+  config, and logs `waybar config sanity check passed` when it's fine.
+  Verify with:
+  ```sh
+  jq -e 'type == "array"' ~/.config/waybar/config
+  journalctl --user -b | grep -i waybar     # GDM sessions log river's children here
+  waybar -l debug                           # run by hand on the live session to see the error
+  ```
 - **Glyph font**: v3 nerd-fonts installs the family as `JetBrainsMono Nerd Font`
   (and the legacy alias `JetBrainsMono NFP`). `style.css` asks for both, so the
   bar is consistent with the NixOS port either way. If you install the font by
@@ -151,7 +165,8 @@ originals.
 
 - `scripts/` and `style.css` are shared — edit once, both ports get it.
 - `fedora/waybar/config.jsonc` mirrors `modules/waybar-config.nix` by hand
-  (Nix → JSON). Change both, or the bar drifts between hosts. The glyph
+  (Nix → JSON). Change both, or the bar drifts between hosts. Keep the top
+  level an array of bar objects — that is what home-manager produces. The glyph
   codepoints, module order and click bindings were cross-checked mechanically
   when the port was written.
 - `fedora/mako/config` mirrors the `services.mako` settings.
