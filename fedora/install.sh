@@ -54,7 +54,7 @@ if (( WITH_DNF )); then
     log "installing packages with dnf (sudo)"
     sudo dnf install -y \
         river-classic \
-        waybar mako wlrctl \
+        waybar mako wlrctl fuzzel \
         jq gawk procps-ng util-linux \
         NetworkManager bluez blueman \
         wireplumber pavucontrol \
@@ -153,7 +153,7 @@ done
 # ---- checks -----------------------------------------------------------------
 log "checking the pieces"
 missing=0
-for cmd in river riverctl rivertile waybar mako wlrctl nmcli bluetoothctl jq wpctl makoctl; do
+for cmd in river riverctl rivertile waybar mako wlrctl fuzzel nmcli bluetoothctl jq wpctl makoctl ghostty; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
         warn "'$cmd' not found on PATH"
         missing=1

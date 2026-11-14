@@ -45,6 +45,7 @@ Installed by `dnf` (Fedora 43, 44, 45 and rawhide at the time of writing):
 | `waybar`           | `waybar` (0.14/0.15, built with `HAVE_RIVER`) | the bar |
 | `mako`             | `mako`, `makoctl`            | notifications, `custom/notify` |
 | `wlrctl`           | `wlrctl`                     | `custom/window` (F42+; older Fedora: placeholder glyph) |
+| `fuzzel`           | `fuzzel`                     | `Super+F` launcher in `river/init` |
 | `jq`, `gawk`, `procps-ng`, `util-linux` | core tools | the `custom/*` scripts |
 | `NetworkManager`   | `nmcli`                      | `custom/wifi` |
 | `bluez`            | `bluetoothctl`               | `custom/bluetooth` |
@@ -141,6 +142,16 @@ you've hit an rfkill soft block: `rfkill list` / `rfkill unblock bluetooth`.
 - **DND**: `makoctl mode -t do-not-disturb` flips Do Not Disturb (the bell in
   the bar, click to toggle). `[mode=do-not-disturb]` in the mako config is what
   makes that do anything.
+- **Terminal and launcher**: the default `river/init` spawns `ghostty`
+  (`Super+Return`) and `fuzzel` (`Super+F`). `fuzzel` is installed by the
+  installer; `ghostty` is **not in the official Fedora repos** — install it
+  from upstream or from a Copr (e.g. `a-zhn/ghostty`), or change the spawn
+  line to a terminal you already have (`kitty`/`foot`/`alacritty` are all in
+  the repos). The installer warns about this at the end if `ghostty` is
+  missing from PATH.
+- **`Super+E` exits river** in this default config (no confirmation prompt) —
+  it used to be unbound; change the binding if that is too close to `Super+Q`
+  for you.
 - **Backlight**: `brightnessctl` works out of the box for the local session on
   Fedora (udev ACL). If the backlight module is empty you're probably on a
   desktop with no `/sys/class/backlight` — that's expected.
@@ -170,6 +181,7 @@ originals.
   codepoints, module order and click bindings were cross-checked mechanically
   when the port was written.
 - `fedora/mako/config` mirrors the `services.mako` settings.
-- `fedora/river/init` mirrors the `wayland.windowManager.river.settings` from
-  the example `home.nix` and starts mako + waybar, which Home Manager used to
-  do via `river-session.target` + the waybar systemd unit.
+- `fedora/river/init` is the Fedora-side default session script: the same
+  bindings and borders as the NixOS river config, with `ghostty`, `fuzzel` and a
+  `Super+E` exit on top. It also starts mako + waybar, which Home Manager used
+  to do via `river-session.target` + the waybar systemd unit.
