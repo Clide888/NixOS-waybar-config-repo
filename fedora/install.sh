@@ -2,17 +2,26 @@
 # install.sh — set up the Fedora port of the river-classic waybar config.
 #
 # What it does (idempotent; safe to re-run):
-#   1. dnf: river-classic, waybar, mako, the script tools, blueman, fonts tools
-#   2. JetBrainsMono Nerd Font -> ~/.local/share/fonts (v3.5.1, GitHub release)
-#   3. backs up anything it would overwrite (timestamped .bak.* next to it)
-#   4. installs waybar config + shared style.css, the custom/* scripts,
+#   1. detects every dependency (dnf packages, the Terra repository, ghostty,
+#      the nerd font) and SKIPS steps 2-4 entirely when they are all present -
+#      in that case it goes straight on to the backups and the config files
+#   2. enables the Terra repository (Fyra Labs / Ultramarine) and installs
+#      ghostty from it - the default river init spawns ghostty on Super+Return
+#      and ghostty is NOT in the official Fedora repos
+#   3. dnf: river-classic, waybar, mako, the script tools, blueman, ...
+#   4. JetBrainsMono Nerd Font -> ~/.local/share/fonts (v3.5.1, GitHub release)
+#   5. backs up anything it would overwrite (timestamped .bak.* next to it)
+#   6. installs waybar config + shared style.css, the custom/* scripts,
 #      mako config and the river init script
-#   5. enables NetworkManager / bluetooth / power-profiles-daemon (best effort)
+#   7. enables NetworkManager / bluetooth / power-profiles-daemon (best effort)
 #
 # Options:
-#   --no-dnf    skip step 1 (packages already installed)
-#   --no-font   skip step 2 (font already installed)
-#   -h, --help  show this text
+#   --no-dnf     skip the Terra/ghostty and dnf package steps (config only)
+#   --no-font    skip the font download (font already installed)
+#   --no-terra   do not enable the Terra repository or install ghostty; the
+#                default Super+Return binding needs ghostty from somewhere -
+#                see README if you opt out
+#   -h, --help   show this text
 #
 # Afterwards: log out, pick the "river" session in the display manager.
 # Nothing here needs a reboot.
@@ -21,14 +30,31 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FONT_URL="https://github.com/ryanoasis/nerd-fonts/releases/download/v3.5.1/JetBrainsMono.zip"
+TERRA_REPO_URL="https://github.com/terrapkg/subatomic-repos/raw/main/terra.repo"
+TERRA_REPO_FILE="/etc/yum.repos.d/terra.repo"
+TERRA_REPOPATH="terra,https://repos.fyralabs.com/terra\$releasever"
 
 WITH_DNF=1
 WITH_FONT=1
+WITH_TERRA=1
 for arg in "$@"; do
     case "$arg" in
-        --no-dnf)  WITH_DNF=0 ;;
-        --no-font) WITH_FONT=0 ;;
-        -h|--help) sed -n '2,16p' "${BASH_SOURCE[0]}"; exit 0 ;;
+        --no-dnf)    WITH_DNF=0 ;;
+        --no-font)   WITH_FONT=0 ;;
+        --no-terra)  WITH_TERRA=0 ;;
+        -h|--help)
+            cat <<'USAGE'
+install.sh — set up the Fedora port of the river-classic waybar config.
+
+  --no-dnf     skip the Terra/ghostty and dnf package steps (config only)
+  --no-font    skip the font download (font already installed)
+  --no-terra   do not enable the Terra repository or install ghostty
+  -h, --help   show this text
+
+Idempotent. If all dependencies are already present the package and font
+steps are skipped automatically and only the config files are (re)installed.
+USAGE
+            exit 0 ;;
         *) echo "install.sh: unknown option '$arg' (see --help)" >&2; exit 2 ;;
     esac
 done
@@ -49,7 +75,104 @@ if rpm -q river >/dev/null 2>&1 && ! rpm -q river-classic >/dev/null 2>&1; then
     warn "install river-classic and let dnf remove river (they conflict): sudo dnf swap river river-classic"
 fi
 
-# ---- 1. packages -----------------------------------------------------------
+# ---- 1. dependency detection ------------------------------------------------
+# Everything the config needs, checked before touching anything:
+# every dnf package, the Terra repo, ghostty and the nerd font. If they are
+# all present the package/font steps become no-ops and only the config is
+# (re)installed - that is the common case on a re-run on a machine that was
+# already set up.
+rpm_ok()  { command -v rpm >/dev/null 2>&1 && rpm -q "$1" >/dev/null 2>&1; }
+font_ok() { command -v fc-list >/dev/null 2>&1 && fc-list 2>/dev/null | grep -qi 'JetBrainsMono.*Nerd'; }
+terra_ok() { [[ -f "$TERRA_REPO_FILE" ]] || rpm_ok terra-release; }
+
+PACKAGES=(
+    river-classic waybar mako wlrctl fuzzel
+    jq gawk procps-ng util-linux
+    NetworkManager bluez blueman
+    wireplumber pavucontrol
+    libnotify brightnessctl
+    upower power-profiles-daemon
+    curl unzip tar
+)
+
+missing_pkgs=()
+if command -v rpm >/dev/null 2>&1; then
+    for p in "${PACKAGES[@]}"; do
+        rpm_ok "$p" || missing_pkgs+=("$p")
+    done
+else
+    warn "rpm not found - assuming packages are missing (dependency detection needs rpm)"
+    missing_pkgs=("${PACKAGES[@]}")
+fi
+have_font=1;    font_ok                       || have_font=0
+have_terra=1;   terra_ok                      || have_terra=0
+have_ghostty=1; command -v ghostty >/dev/null 2>&1 || have_ghostty=0
+
+# Terra + ghostty only count as dependencies when the user has not opted out;
+# --no-terra means "I will sort out a terminal myself".
+deps_ok=1
+((${#missing_pkgs[@]} == 0)) || deps_ok=0
+(( have_font ))              || deps_ok=0
+if (( WITH_TERRA )); then
+    (( have_terra && have_ghostty )) || deps_ok=0
+fi
+
+if (( WITH_DNF )) && (( deps_ok )); then
+    if (( WITH_TERRA )); then
+        log "all dependencies already present (packages, Terra repo, ghostty, nerd font) - skipping to the config"
+    else
+        log "all dependencies already present (packages, nerd font; Terra opted out) - skipping to the config"
+    fi
+    WITH_DNF=0
+    WITH_FONT=0
+    WITH_TERRA=0
+else
+    if (( WITH_DNF )); then
+        ((${#missing_pkgs[@]})) && log "missing packages: ${missing_pkgs[*]}"
+        (( have_font )) || log "JetBrainsMono Nerd Font not visible to fontconfig"
+        if (( WITH_TERRA )); then
+            (( have_terra ))   || log "Terra repository not enabled (ghostty lives there)"
+            (( have_ghostty )) || log "ghostty not installed"
+        fi
+    fi
+fi
+
+# ---- 2. Terra repository + ghostty ------------------------------------------
+# Fyra Labs' third-party repo (the Ultramarine team). It is GPG-signed and
+# carries ghostty, which is not in the official repos. Opt out with --no-terra.
+ensure_terra() {
+    if terra_ok; then
+        log "Terra repository already enabled"
+        return 0
+    fi
+    log "enabling the Terra repository (third-party, GPG-signed) for ghostty"
+    if sudo dnf config-manager addrepo --from-repofile="$TERRA_REPO_URL" 2>/dev/null; then
+        return 0
+    elif sudo dnf config-manager --add-repo "$TERRA_REPO_URL" 2>/dev/null; then
+        # dnf 4 syntax
+        return 0
+    else
+        warn "dnf config-manager failed - falling back to a direct repofrompath install of terra-release"
+        sudo dnf install -y --nogpgcheck --repofrompath "$TERRA_REPOPATH" terra-release
+    fi
+}
+
+if (( WITH_DNF && WITH_TERRA )); then
+    if ensure_terra; then
+        if command -v ghostty >/dev/null 2>&1; then
+            log "ghostty already installed"
+        else
+            log "installing ghostty from Terra"
+            sudo dnf install -y ghostty \
+                || warn "ghostty install failed - Super+Return needs it; install it by hand or edit fedora/river/init"
+        fi
+    else
+        warn "could not enable the Terra repository - ghostty was not installed"
+        warn "enable it by hand (see fedora/README.md) or change the Super+Return binding in fedora/river/init"
+    fi
+fi
+
+# ---- 3. packages -------------------------------------------------------------
 if (( WITH_DNF )); then
     log "installing packages with dnf (sudo)"
     sudo dnf install -y \
@@ -63,11 +186,11 @@ if (( WITH_DNF )); then
         curl unzip tar
 fi
 
-# ---- 2. JetBrainsMono Nerd Font -------------------------------------------
+# ---- 4. JetBrainsMono Nerd Font ---------------------------------------------
 # Not in the Fedora repos; the nerd-fonts GitHub release is the upstream
 # distribution. The bar needs the glyphs, not the plain JetBrains Mono font.
 if (( WITH_FONT )); then
-    if fc-list 2>/dev/null | grep -qi 'JetBrainsMono.*Nerd'; then
+    if font_ok; then
         log "JetBrainsMono Nerd Font already visible to fontconfig - skipping"
     else
         log "installing JetBrainsMono Nerd Font 3.5.1 into ~/.local/share/fonts"
@@ -86,7 +209,7 @@ if (( WITH_FONT )); then
     fi
 fi
 
-# ---- 3. backup + 4. install ------------------------------------------------
+# ---- 5. backup + 6. install -------------------------------------------------
 ts="$(date +%Y%m%d-%H%M%S)"
 backup() {  # backup <path> - copy to path.bak.<ts> if it exists
     local p="$1"
@@ -140,7 +263,7 @@ install -Dm755 "$REPO_ROOT/fedora/river/init" "$HOME/.config/river/init"
 log "installing waybar-launch into ~/.local/bin"
 install -Dm755 "$REPO_ROOT/scripts/launch.sh" "$HOME/.local/bin/waybar-launch"
 
-# ---- 5. system services (best effort; they are system-wide) ----------------
+# ---- 7. system services (best effort; they are system-wide) ----------------
 for unit in NetworkManager.service bluetooth.service power-profiles-daemon.service; do
     if systemctl list-unit-files "$unit" >/dev/null 2>&1; then
         log "ensuring $unit is enabled and running"

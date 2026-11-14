@@ -2,8 +2,9 @@
 
 The same Catppuccin Mocha bar as the NixOS/Home Manager setup in the repo root,
 as plain config files for **Fedora**: waybar + mako + river-classic from the
-official Fedora repos, an installer script, and no Nix anywhere in sight.
-Scripts, `style.css` and behavior are identical to the NixOS port.
+official Fedora repos (ghostty from the third-party Terra repo), an installer
+script, and no Nix anywhere in sight. Scripts, `style.css` and behavior are
+identical to the NixOS port.
 
 ```
 fedora/
@@ -26,9 +27,16 @@ fedora/install.sh
 # log out, pick the "river" session in the display manager (GDM's gear menu)
 ```
 
-`install.sh` is idempotent. Flags: `--no-dnf` (skip packages, config only),
-`--no-font` (skip the font download). Everything it would overwrite is backed
-up first as `<file>.bak.<timestamp>`.
+`install.sh` is idempotent. It **detects dependencies first** — dnf packages
+(`rpm -q`), the Nerd Font (via `fc-list`), the Terra repository (repo file or
+`terra-release` rpm) and `ghostty` (PATH) — and if everything is already there
+it skips the dependency phase entirely and goes straight to installing the
+config files ("all dependencies already present ... skipping to the config").
+On a partial install it only does what's missing (the dnf package install is
+idempotent, so dnf skips anything already present). Flags: `--no-dnf` (skip
+the Terra/ghostty and dnf package steps), `--no-font` (skip the font
+download), `--no-terra` (don't enable Terra / don't install ghostty). Everything it would overwrite is
+backed up first as `<file>.bak.<timestamp>`.
 
 After login the bar and notifications are started by `~/.config/river/init` —
 there is no systemd service to enable. If the bar is not there, run `waybar`
@@ -58,6 +66,16 @@ Installed by `dnf` (Fedora 43, 44, 45 and rawhide at the time of writing):
 | `power-profiles-daemon` | `power-profiles-daemon`  | power-profiles-daemon module |
 | `curl`, `unzip`    | —                            | the font install |
 
+### The Terra repository (ghostty only)
+
+One more dependency is not in the official repos: **`ghostty`**. The installer
+enables [Terra](https://repos.fyralabs.com/) (Fyra Labs' third-party Fedora
+repo, the one Ultramarine ships in) — it is GPG-signed and just a yum repo
+file — and installs `ghostty` from it. Enabling it adds
+`/etc/yum.repos.d/terra.repo` to your system; nothing else is repo-scoped.
+Prefer not to add a third-party repo? `fedora/install.sh --no-terra` skips
+both the repo and ghostty — then point `Super+Return` in `~/.config/river/init`
+at a terminal you have (`kitty`, `foot`, `alacritty` are all official).
 `NetworkManager`, `bluetooth` and `power-profiles-daemon` are
 `systemctl enable --now`d by the installer (idempotent; skip with a transplant
 if you manage services yourself).
@@ -88,8 +106,10 @@ Fedora ships two different compositors:
 | `~/.local/bin/waybar-launch` | restart the bar without logging out |
 | `~/.local/share/fonts/JetBrainsMonoNerdFont` | JetBrainsMono Nerd Font 3.5.1 (not in the Fedora repos) |
 
-Nothing outside your home directory is touched except `dnf` packages and
-`systemctl enable --now` for the three system services above.
+Nothing outside your home directory is touched except: `dnf` packages,
+`systemctl enable --now` for the three system services above, and (unless
+`--no-terra`) the Terra yum repo file at `/etc/yum.repos.d/terra.repo` plus
+the `terra-release` package that pins its GPG key.
 
 ### Why not `~/.config/systemd/user/waybar.service`?
 
@@ -144,11 +164,9 @@ you've hit an rfkill soft block: `rfkill list` / `rfkill unblock bluetooth`.
   makes that do anything.
 - **Terminal and launcher**: the default `river/init` spawns `ghostty`
   (`Super+Return`) and `fuzzel` (`Super+F`). `fuzzel` is installed by the
-  installer; `ghostty` is **not in the official Fedora repos** — install it
-  from upstream or from a Copr (e.g. `a-zhn/ghostty`), or change the spawn
-  line to a terminal you already have (`kitty`/`foot`/`alacritty` are all in
-  the repos). The installer warns about this at the end if `ghostty` is
-  missing from PATH.
+  installer; `ghostty` comes from the Terra repo (see above) and is installed
+  automatically unless you pass `--no-terra`. The installer warns at the end
+  if `ghostty` is still missing from PATH.
 - **`Super+E` exits river** in this default config (no confirmation prompt) —
   it used to be unbound; change the binding if that is too close to `Super+Q`
   for you.
@@ -166,7 +184,8 @@ you've hit an rfkill soft block: `rfkill list` / `rfkill unblock bluetooth`.
 
 ```sh
 fedora/uninstall.sh       # removes the installed files; leaves dnf alone
-sudo dnf remove river-classic waybar mako wlrctl blueman   # optional
+sudo dnf remove river-classic waybar mako wlrctl blueman ghostty   # optional
+sudo dnf remove terra-release && sudo rm /etc/yum.repos.d/terra.repo   # optional: drop Terra
 ```
 
 Backups made by the installer are `<file>.bak.<timestamp>` next to the
