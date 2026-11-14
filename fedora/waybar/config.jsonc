@@ -1,0 +1,167 @@
+{
+  "mainBar": {
+    "layer": "top",
+    "position": "top",
+    "height": 26,
+    "spacing": 2,
+    "exclusive": true,
+    "gtk-layer-shell": true,
+    "passthrough": false,
+    "fixed-center": true,
+
+    "modules-left": [
+      "clock",
+      "battery",
+      "custom/window"
+    ],
+
+    "modules-center": [
+      "river/tags"
+    ],
+
+    "modules-right": [
+      "backlight",
+      "wireplumber",
+      "custom/uptime",
+      "custom/wifi",
+      "custom/bluetooth",
+      "power-profiles-daemon",
+      "custom/sysinfo",
+      "custom/notify"
+    ],
+
+    "river/tags": {
+      "num-tags": 9,
+      "tag-labels": [ "1", "2", "3", "4", "5", "6", "7", "8", "9" ],
+      "disable-click": false,
+      "hide-vacant": false
+    },
+
+    "clock": {
+      "format": "󰥔 {:%H:%M}",
+      "calendar": {
+        "format": {
+          "days": "<span weight='normal'>{}</span>",
+          "months": "<span color='#cdd6f4'><b>{}</b></span>",
+          "today": "<span color='#f38ba8' weight='700'><u>{}</u></span>",
+          "weekdays": "<span color='#f9e2af'><b>{}</b></span>",
+          "weeks": "<span color='#a6e3a1'><b>W{}</b></span>"
+        },
+        "mode": "month",
+        "mode-mon-col": 1,
+        "on-scroll": 1
+      },
+      "tooltip-format": "<span color='#cdd6f4' font='JetBrainsMono Nerd Font 14'><tt><small>{calendar}</small></tt></span>"
+    },
+
+    "battery": {
+      "states": {
+        "warning": 20,
+        "critical": 15
+      },
+      "format": "{icon} {capacity}%",
+      "format-charging": "󰂄 {capacity}%",
+      "format-plugged": "󰚥 {capacity}%",
+      "format-icons": {
+        "default": [ "󰂎", "󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹" ],
+        "charging": [ "󰢟", "󰢜", "󰂆", "󰂇", "󰂈", "󰢝", "󰂉", "󰢞", "󰂊", "󰂋", "󰂅" ]
+      },
+      "format-time": "{H}s {M}dk",
+      "tooltip-format-discharging": "{timeTo}  ·  {power}W",
+      "tooltip-format-charging": "{timeTo}",
+      "tooltip-format-full": "Battery full",
+      "events": {
+        "on-discharging-critical": "notify-send -u critical -a Battery -i battery-caution 'Battery critical' 'You need to charge'"
+      }
+    },
+
+    "power-profiles-daemon": {
+      "format": "{icon}",
+      "tooltip-format": "Power profile: {profile}\nClick → switch",
+      "format-icons": {
+        "default": "󰾅",
+        "performance": "󰓅",
+        "balanced": "󰾅",
+        "power-saver": "󰾆"
+      }
+    },
+
+    "backlight": {
+      "format": "{icon} {percent}%",
+      "format-icons": [ "󰃞", "󰃟", "󰃠" ],
+      "tooltip": false
+    },
+
+    "wireplumber": {
+      "format": "{icon} {volume}%{format_source}",
+      "format-muted": "󰝟{format_source}",
+      "format-bluetooth": "󰂰 {volume}%{format_source}",
+      "format-bluetooth-muted": "󰂲{format_source}",
+      "format-source": "",
+      "format-source-muted": " 󰍭",
+      "format-icons": [ "󰕿", "󰖀", "󰕾" ],
+      "scroll-step": 5,
+      "max-volume": 120,
+      "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
+      "on-click-right": "pavucontrol",
+      "tooltip-format": "{node_name}  ·  {volume}%"
+    },
+
+    "custom/window": {
+      "format": "{text}",
+      "return-type": "json",
+      "exec": "$HOME/.config/waybar/scripts/window.sh",
+      "escape": true,
+      "max-length": 25,
+      "interval": 2,
+      "tooltip": true
+    },
+
+    "custom/uptime": {
+      "format": "󰔟 {text}",
+      "return-type": "json",
+      "exec": "$HOME/.config/waybar/scripts/uptime.sh",
+      "interval": 1,
+      "tooltip": true,
+      "on-click": "$HOME/.config/waybar/scripts/stopwatch.sh toggle",
+      "on-click-right": "$HOME/.config/waybar/scripts/stopwatch.sh reset"
+    },
+
+    "custom/wifi": {
+      "format": "{text}",
+      "return-type": "json",
+      "exec": "$HOME/.config/waybar/scripts/wifi.sh",
+      "interval": 10,
+      "tooltip": true
+    },
+
+    "custom/bluetooth": {
+      "format": "{text}",
+      "return-type": "json",
+      "exec": "$HOME/.config/waybar/scripts/bluetooth.sh",
+      "interval": 10,
+      "tooltip": true,
+      "on-click": "$HOME/.config/waybar/scripts/bluetooth.sh toggle",
+      "on-click-right": "blueman-manager"
+    },
+
+    "custom/sysinfo": {
+      "format": "{text}",
+      "return-type": "json",
+      "exec": "$HOME/.config/waybar/scripts/sysinfo.sh",
+      "interval": 2,
+      "tooltip": true,
+      "on-click": "$HOME/.config/waybar/scripts/system-reset.sh"
+    },
+
+    "custom/notify": {
+      "format": "{text}",
+      "return-type": "json",
+      "exec": "$HOME/.config/waybar/scripts/notify.sh",
+      "interval": 5,
+      "tooltip": true,
+      "on-click": "$HOME/.config/waybar/scripts/notify-toggle.sh",
+      "on-click-right": "makoctl dismiss -a"
+    }
+  }
+}

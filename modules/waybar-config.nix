@@ -20,11 +20,15 @@ let
   # shebang would not work: writeShellApplication prepends its own
   # `set -o errexit` prologue, and a second shebang would land in the middle of
   # the file.
+  #
+  # `name` is passed as $0: without it, a first argument meant for the script
+  # (`waybar-stopwatch toggle`) would be swallowed by bash as $0 and the script's
+  # own $1 would be empty.
   mkScript = { file, name, runtimeInputs }:
     pkgs.writeShellApplication {
       inherit name runtimeInputs;
       text = ''
-        exec ${pkgs.bash}/bin/bash -c ${lib.escapeShellArg (builtins.readFile (src + "/${file}.sh"))} "$@"
+        exec ${pkgs.bash}/bin/bash -c ${lib.escapeShellArg (builtins.readFile (src + "/${file}.sh"))} ${lib.escapeShellArg name} "$@"
       '';
     };
 
@@ -52,10 +56,20 @@ let
     runtimeInputs = with pkgs; [ river-classic coreutils util-linux ];
   };
 
-  wifiBt = mkScript {
-    file = "wifi_bt";
-    name = "waybar-wifi-bt";
-    runtimeInputs = with pkgs; [ coreutils jq gawk networkmanager bluez ];
+  wifi = mkScript {
+    file = "wifi";
+    name = "waybar-wifi";
+    runtimeInputs = with pkgs; [ coreutils jq gawk networkmanager ];
+  };
+
+  # nf-md Bluetooth widget, split out of the old combined wifi_bt script so it
+  # gets its own capsule next to custom/wifi. `toggle` is the on-click action
+  # ($1 travels through the wrapper - see mkScript above). blueman-manager is
+  # only needed for the right click; it is in home.packages via waybar-river.nix.
+  bluetooth = mkScript {
+    file = "bluetooth";
+    name = "waybar-bluetooth";
+    runtimeInputs = with pkgs; [ coreutils jq gawk bluez ];
   };
 
   # wlrctl is only a fallback source for the app name (see scripts/window.sh);
@@ -110,6 +124,7 @@ in
           "wireplumber"
           "custom/uptime"
           "custom/wifi"
+          "custom/bluetooth"
           "power-profiles-daemon"
           "custom/sysinfo"
           "custom/notify"
@@ -163,7 +178,9 @@ in
 
         power-profiles-daemon = {
           format = "{icon}";
-          tooltip-format = "Power profile: {profile}\\nClick → switch";
+          # \n is a real newline here (GTK labels honor it); a doubled backslash
+          # would end up on screen as a literal "\n" in the tooltip.
+          tooltip-format = "Power profile: {profile}\nClick → switch";
           format-icons = {
             default = "󰾅";
             performance = "󰓅";
@@ -224,9 +241,22 @@ in
         "custom/wifi" = {
           format = "{text}";
           return-type = "json";
-          exec = "${wifiBt}/bin/waybar-wifi-bt";
+          exec = "${wifi}/bin/waybar-wifi";
           interval = 10;
           tooltip = true;
+        };
+
+        # custom/bluetooth - sits between custom/wifi and power-profiles-daemon.
+        # Glyph = controller state (off / on / connected); tooltip lists the
+        # paired-and-connected devices with battery percentages.
+        "custom/bluetooth" = {
+          format = "{text}";
+          return-type = "json";
+          exec = "${bluetooth}/bin/waybar-bluetooth";
+          interval = 10;
+          tooltip = true;
+          on-click = "${bluetooth}/bin/waybar-bluetooth toggle";
+          on-click-right = "blueman-manager";
         };
 
         "custom/sysinfo" = {

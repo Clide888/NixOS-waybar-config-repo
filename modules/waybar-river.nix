@@ -18,11 +18,13 @@ let
   # pasted in: writeShellApplication prepends its own `set -o errexit` prologue,
   # so a shebang copied in from the file would land mid-script. The scripts use
   # bash-only syntax (`[[ ]]`, arrays), hence bash and not the wrapper's /bin/sh.
+  # `name` is passed as $0: without it, a first argument meant for the script
+  # would be swallowed by bash as $0 and the script's own $1 would be empty.
   mkScript = { file, name, runtimeInputs }:
     pkgs.writeShellApplication {
       inherit name runtimeInputs;
       text = ''
-        exec ${pkgs.bash}/bin/bash -c ${lib.escapeShellArg (builtins.readFile (../scripts + "/${file}.sh"))} "$@"
+        exec ${pkgs.bash}/bin/bash -c ${lib.escapeShellArg (builtins.readFile (../scripts + "/${file}.sh"))} ${lib.escapeShellArg name} "$@"
       '';
     };
 
@@ -80,7 +82,8 @@ in
       jq              # every custom/* module
       wlrctl          # custom/window: activated toplevel -> app name
       networkmanager  # nmcli        -> custom/wifi
-      bluez           # bluetoothctl -> custom/wifi tooltip
+      bluez           # bluetoothctl -> custom/bluetooth
+      blueman         # blueman-manager, custom/bluetooth right click
       pavucontrol     # volume module, right click
       libnotify       # battery-critical notification
       river-classic   # riverctl     -> system-reset, toggle-tag-bar

@@ -1,7 +1,9 @@
 * {
   min-height: 0;
   min-width: 0;
-  font-family: "JetBrainsMono NFP";
+  /* v3 nerd-fonts family name first, the NixOS/nixpkgs alias second, plain
+     monospace as the last resort so icons degrade to boxes rather than nothing. */
+  font-family: "JetBrainsMono Nerd Font", "JetBrainsMono NFP", monospace;
   font-size: 12px;
   font-weight: 600;
   /* Padding/margin here compounds across every widget - keep it empty. */
@@ -94,6 +96,7 @@ padding (inner spacing)
 #clock,
 #custom-uptime,
 #custom-wifi,
+#custom-bluetooth,
 #custom-sysinfo,
 #custom-notify,
 #custom-window {
@@ -113,12 +116,27 @@ padding (inner spacing)
   color: #89b4fa;
 }
 
-/* nmcli + bluetoothctl, color preserved from the old network module */
+/* nmcli, color preserved from the old network module */
 #custom-wifi {
   color: peru;
 }
 
 #custom-wifi.disconnected {
+  color: #6c7086;
+}
+
+/* bluetoothctl - network-family neighbor of #custom-wifi. Blue when the
+   controller is on, sky when a device is connected, dimmed when off. */
+#custom-bluetooth,
+#custom-bluetooth.on {
+  color: #89b4fa;
+}
+
+#custom-bluetooth.connected {
+  color: #89dceb;
+}
+
+#custom-bluetooth.off {
   color: #6c7086;
 }
 

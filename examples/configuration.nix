@@ -10,7 +10,7 @@
   networking.hostName = "HOSTNAME";
   networking.networkmanager.enable = true;   # nmcli -> custom/wifi
 
-  hardware.bluetooth.enable = true;          # bluetoothctl -> custom/wifi tooltip
+  hardware.bluetooth.enable = true;          # bluetoothctl -> custom/bluetooth
   hardware.bluetooth.powerOnBoot = true;
 
   # ---- graphical session ------------------------------------------------

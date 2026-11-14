@@ -1,10 +1,12 @@
 ![Showcase](images/waybar.png)
 
-# Waybar config — river-classic on NixOS
+# Waybar config — river-classic on NixOS (+ a Fedora port in `fedora/`)
 
 A [Waybar](https://github.com/Alexays/Waybar) status bar themed
 [Catppuccin Mocha](https://catppuccin.com/), rewritten from a Hyprland-on-Arch
-setup for **river-classic** (river 0.3.x) on **NixOS + Home Manager**.
+setup for **river-classic** (river 0.3.x) on **NixOS + Home Manager**. A plain
+config-file port for **Fedora** (river-classic from the official repos, no
+Home Manager) lives in [`fedora/`](fedora/) — see its README.
 
 The layout, colors and behaviour are the same where river can support them. The
 sections below list exactly what changed and why — nothing was silently dropped.
@@ -18,7 +20,8 @@ sections below list exactly what changed and why — nothing was silently droppe
 │   └── waybar-river.nix    # packages, mako, river bindings
 ├── examples/               # copy-paste flake.nix / configuration.nix / home.nix
 ├── scripts/                # the custom/* module backends (bash)
-├── style.css               # GTK3 CSS, read by waybar-config.nix
+├── style.css               # GTK3 CSS, read by waybar-config.nix and the Fedora port
+├── fedora/                 # Fedora port: installer + waybar/mako/river drop-ins
 └── LICENCE                 # MIT, from the original project
 ```
 
@@ -78,7 +81,7 @@ inputs.waybar-river.url =
 # configuration.nix
 services.displayManager.sessionPackages = [ pkgs.river-classic ];
 networking.networkmanager.enable = true;      # nmcli, custom/wifi
-hardware.bluetooth.enable = true;             # bluetoothctl, custom/wifi
+hardware.bluetooth.enable = true;             # bluetoothctl, custom/bluetooth
 services.power-profiles-daemon.enable = true; # power-profiles-daemon module
 services.upower.enable = true;                # battery module
 hardware.acpilight.enable = true;             # backlight module
@@ -113,8 +116,8 @@ home-manager build --flake .#USER@HOSTNAME
 |---|---|
 | Tags render but never highlight, `river/window` empty | you are running `pkgs.river` (0.4+), not `river-classic` |
 | Bar never appears | no display manager session: check `services.displayManager.sessionPackages` includes `river-classic`, or start it once by hand with `waybar` |
-| Glyphs are boxes | `nerd-fonts.jetbrains-mono` is installed per-user by the module; check `fc-list \| grep -i "JetBrainsMono NFP"` inside the session |
-| `custom/*` capsules empty | run the script by hand, e.g. `waybar-wifi-bt`, and read stderr |
+| Glyphs are boxes | `nerd-fonts.jetbrains-mono` is installed per-user by the module; check `fc-list \| grep -iE "JetBrainsMono.*(Nerd|NFP)"` inside the session |
+| `custom/*` capsules empty | run the script by hand, e.g. `waybar-wifi` / `waybar-bluetooth`, and read stderr |
 | `power-profiles-daemon` empty | `services.power-profiles-daemon.enable = true`, and no `services.tlp` (they conflict) |
 | `custom/notify` shows the "on" bell but DND does nothing | `makoctl mode` must list `do-not-disturb`; `services.mako` in this module sets it up |
 
@@ -160,8 +163,9 @@ clears all notifications (`makoctl dismiss -a`). Config lives in
 
 ### Kept, ported as-is
 
-`custom/uptime` + stopwatch, `custom/wifi` (nmcli + bluetoothctl, one tooltip),
-`custom/sysinfo` (CPU/RAM, thresholds, pulse animation), battery, backlight,
+`custom/uptime` + stopwatch, `custom/wifi` + `custom/bluetooth` (nmcli /
+bluetoothctl, one capsule each), `custom/sysinfo` (CPU/RAM, thresholds, pulse
+animation), battery, backlight,
 `wireplumber`, `power-profiles-daemon`, clock with the calendar tooltip. Same
 scripts, with the small fixes listed below.
 
@@ -170,9 +174,15 @@ scripts, with the small fixes listed below.
 - **Glyphs are octal UTF-8 now, not `printf '\U000F13AB'`.** Under a POSIX/ASCII
   locale — the usual locale of a systemd user service — bash writes the literal
   text `\U000F13AB` instead of the glyph. Verified and fixed in every script.
-- `scripts/wifi_bt.sh` no longer hardcodes `wlo1`; the interface is detected from
+- `scripts/wifi.sh` no longer hardcodes `wlo1`; the interface is detected from
   NetworkManager, with `WAYBAR_WIFI_IFACE` as an override. `grep -oP` (GNU grep
-  PCRE) became `sed`, and the WiFi glyphs are built with `printf`.
+  PCRE) became `sed`, and the WiFi glyphs are built with `printf`. The Bluetooth
+  half moved out into `scripts/bluetooth.sh` (`custom/bluetooth`).
+- **The script wrappers pass the script name as `$0`.** Without it, the first
+  argument meant for the script was swallowed by `bash -c` as `$0`, so
+  `waybar-stopwatch toggle` (the stopwatch left click) never did anything.
+- The `power-profiles-daemon` tooltip uses a real newline, not a literal `\n`
+  that would show up as text on the bar.
 - `scripts/launch.sh` actually restarts the bar. The original
   `pgrep -x waybar && killall waybar || waybar &` never restarted anything:
   `killall` succeeded, so the `||` branch was skipped and the bar just vanished.
@@ -186,7 +196,7 @@ scripts, with the small fixes listed below.
 |----------|---------|
 | left     | clock, battery, custom/window |
 | center   | river/tags |
-| right    | backlight, wireplumber, custom/uptime, custom/wifi, power-profiles-daemon, custom/sysinfo, custom/notify |
+| right    | backlight, wireplumber, custom/uptime, custom/wifi, custom/bluetooth, power-profiles-daemon, custom/sysinfo, custom/notify |
 
 - **clock** — `H:M`, calendar in the tooltip
 - **battery** — icon + %, color-only warning/critical, `notify-send` on critical
@@ -196,7 +206,11 @@ scripts, with the small fixes listed below.
   click opens `pavucontrol`, mic-off glyph when the source is muted
 - **custom/uptime** — `uptime -p`, doubles as a stopwatch (left click
   start/pause, right click reset)
-- **custom/wifi** — WiFi signal + Bluetooth in one tooltip
+- **custom/wifi** — WiFi signal; the tooltip carries SSID and signal strength
+- **custom/bluetooth** — right next to `custom/wifi`; glyph shows the controller
+  state (off / on / connected), tooltip lists connected devices with battery
+  percentages; left click toggles the radio power, right click opens
+  `blueman-manager`
 - **power-profiles-daemon** — click cycles the profile
 - **custom/sysinfo** — CPU + RAM; click respawns the app set (see above)
 - **custom/notify** — mako DND state
@@ -211,7 +225,8 @@ the tools they need (`jq`, `nmcli`, `bluetoothctl`, `makoctl`, `wlrctl`,
 |---|---|---|
 | `uptime.sh`, `stopwatch.sh` | `custom/uptime` | jq, coreutils |
 | `sysinfo.sh` | `custom/sysinfo` | jq, gawk, procps |
-| `wifi_bt.sh` | `custom/wifi` | jq, nmcli, bluetoothctl |
+| `wifi.sh` | `custom/wifi` | jq, nmcli |
+| `bluetooth.sh` | `custom/bluetooth` | jq, bluetoothctl (`blueman-manager` for the right click) |
 | `window.sh` | `custom/window` | jq, wlrctl |
 | `notify.sh`, `notify-toggle.sh` | `custom/notify` | jq, makoctl |
 | `system-reset.sh` | `custom/sysinfo` click, `META+SHIFT+R` | riverctl |
@@ -233,6 +248,20 @@ Override the app set spawned by the reset button with
 4. `~/.config/waybar`, `~/.config/mako` and `~/.config/river/init` become
    read-only store symlinks. Do not edit them in place; edit `home.nix`.
 
+## Fedora
+
+A plain config-file port for Fedora (river-classic from the official repos, no
+Home Manager) is in [`fedora/`](fedora/). Short version:
+
+```sh
+git clone <this repo> && cd NixOS-waybar-config-repo
+fedora/install.sh        # dnf deps, nerd font, ~/.config drop-ins, backups
+# log out, pick the "river" session at the display manager
+```
+
+`fedora/README.md` documents the package mapping, what gets installed where,
+and how the Bluetooth widget behaves.
+
 ## Restarting the bar
 
 ```
@@ -253,6 +282,7 @@ screen this distinction never comes up.
 
 Everything is `home.packages` in `modules/waybar-river.nix`, all from nixpkgs:
 `waybar`, `river-classic`, `wlrctl`, `mako`, `jq`, `networkmanager` (nmcli),
-`bluez` (bluetoothctl), `pavucontrol`, `libnotify`,
-`nerd-fonts.jetbrains-mono` (the `JetBrainsMono NFP` glyph font).
+`bluez` (bluetoothctl), `blueman`, `pavucontrol`, `libnotify`,
+`nerd-fonts.jetbrains-mono` (the nerd-fonts family; style.css accepts both the
+`JetBrainsMono Nerd Font` and `JetBrainsMono NFP` family names).
 `services.waybar-river.extraPackages` adds more.

@@ -1,0 +1,71 @@
+#!/bin/sh
+# river init — what river reads at startup ($XDG_CONFIG_HOME/river/init).
+# Mirrors the Home Manager river config of the NixOS port (border width,
+# colors, layout, bindings) and additionally starts the two things river
+# itself never starts: mako (notifications) and waybar (the bar).
+#
+# NOTE: waybar's rpm ships a systemd *user* unit bound to
+# graphical-session.target, which a river session never activates — so
+# `systemctl --user enable waybar` would not help here. Spawning from init
+# is the supported route for river.
+#
+# river sends SIGTERM to the init process group on exit, so mako and waybar
+# are taken down with the session.
+
+SCRIPTS="$HOME/.config/waybar/scripts"
+
+# --- appearance -----------------------------------------------------------
+riverctl border-width 2
+riverctl border-color-focused 0x7aa2f7
+riverctl border-color-unfocused 0x3b4261
+# riverctl background-color 0x1e1e2e   # uncomment for a solid Catppuccin base
+
+riverctl set-repeat 50 300
+
+# --- layout ---------------------------------------------------------------
+riverctl default-layout rivertile
+rivertile -view-padding 4 -outer-padding 4 &
+
+# --- bindings (were wayland.windowManager.river.settings on NixOS) --------
+riverctl map normal Super Return spawn 'kitty'
+riverctl map normal Super Q close
+riverctl map normal Super J focus-view next
+riverctl map normal Super K focus-view previous
+riverctl map normal Super Shift J swap next
+riverctl map normal Super Shift K swap previous
+riverctl map normal Super 1 set-focused-tags 1
+riverctl map normal Super 2 set-focused-tags 2
+riverctl map normal Super 3 set-focused-tags 4
+riverctl map normal Super 4 set-focused-tags 8
+riverctl map normal Super 5 set-focused-tags 16
+riverctl map normal Super Shift 1 toggle-focused-tags 1
+riverctl map normal Super Shift 2 toggle-focused-tags 2
+riverctl map normal Super Shift 3 toggle-focused-tags 4
+riverctl map normal Super Shift 4 toggle-focused-tags 8
+riverctl map normal Super Shift 5 toggle-focused-tags 16
+
+# hide/show the bar on the current tag; record the app set for META+SHIFT+R
+# (paths are quoted so a home directory with spaces survives)
+riverctl map normal Super A spawn "\"$SCRIPTS/toggle-tag-bar.sh\""
+riverctl map normal Super Shift R spawn "\"$SCRIPTS/system-reset.sh\""
+
+# There is no exit binding here, exactly like the NixOS config this is ported
+# from — log out the way you logged in (display manager), or uncomment:
+# riverctl map normal Super Shift E exit
+
+riverctl map-pointer normal Super BTN_LEFT move-view
+riverctl map-pointer normal Super BTN_RIGHT resize-view
+
+# media keys
+riverctl map normal None XF86AudioRaiseVolume spawn 'wpctl set-volume -l 1.2 @DEFAULT_AUDIO_SINK@ 5%+'
+riverctl map normal None XF86AudioLowerVolume spawn 'wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-'
+riverctl map normal None XF86AudioMute spawn 'wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle'
+riverctl map normal None XF86AudioMicMute spawn 'wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle'
+riverctl map normal None XF86MonBrightnessUp spawn 'brightnessctl set +5%'
+riverctl map normal None XF86MonBrightnessDown spawn 'brightnessctl set 5%-'
+
+# --- notifications --------------------------------------------------------
+mako &
+
+# --- status bar -----------------------------------------------------------
+waybar &
